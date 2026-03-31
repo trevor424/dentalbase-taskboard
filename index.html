@@ -34,12 +34,11 @@
   * { margin:0; padding:0; box-sizing:border-box; }
   body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
 
-  .conn-bar { padding:10px 32px; font-size:.82rem; display:flex; align-items:center; gap:8px; }
-  .conn-bar.ok { background:var(--conn-ok-bg); color:var(--conn-ok-color); border-bottom:2px solid var(--done); }
-  .conn-bar.err { background:var(--conn-err-bg); color:var(--high); border-bottom:2px solid var(--high); }
-  .conn-bar .dot { width:8px; height:8px; border-radius:50%; }
-  .conn-bar.ok .dot { background:var(--done); }
-  .conn-bar.err .dot { background:var(--high); }
+  .conn-bar { display:none; }
+  .status-dot { width:8px; height:8px; border-radius:50%; display:inline-block; margin-left:10px; }
+  .status-dot.ok { background:var(--done); }
+  .status-dot.err { background:var(--high); animation:pulse 1.5s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
 
   header { background:var(--primary); color:#fff; padding:20px 32px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; }
   header h1 { font-size:1.4rem; font-weight:700; }
@@ -126,7 +125,7 @@
 </div>
 
 <header>
-  <h1>Task Board</h1>
+  <h1>Task Board <span class="status-dot ok" id="statusDot" title="Connected"></span></h1>
   <div class="header-actions">
     <button onclick="openModal()">+ New Task</button>
     <button onclick="refreshTasks()">Refresh</button>
@@ -246,9 +245,9 @@ function toast(msg, dur) {
 }
 
 function setConn(ok, text) {
-  var bar = document.getElementById('connBar');
-  bar.className = 'conn-bar ' + (ok ? 'ok' : 'err');
-  document.getElementById('connText').textContent = text;
+  var dot = document.getElementById('statusDot');
+  dot.className = 'status-dot ' + (ok ? 'ok' : 'err');
+  dot.title = text;
 }
 
 // ---- JSONP ----
