@@ -48,10 +48,12 @@
   .col-header .count { margin-left:auto; background:var(--bg); padding:2px 8px; border-radius:12px; font-size:.75rem; color:var(--muted); }
   .col-body { padding:10px; min-height:120px; }
 
-  .task { background:var(--bg); border-radius:8px; padding:12px; margin-bottom:8px; cursor:grab; border-left:4px solid transparent; transition:box-shadow .15s, opacity .15s, transform .15s; position:relative; user-select:none; }
-  .task:hover { box-shadow:0 2px 8px rgba(0,0,0,.08); }
-  .task.dragging { opacity:.4; transform:scale(.97); }
-  .task.drag-over { box-shadow:0 -3px 0 0 var(--primary), 0 2px 8px rgba(0,0,0,.08); }
+  .task { background:var(--bg); border-radius:8px; padding:12px; margin-bottom:8px; cursor:grab; border-left:4px solid transparent; transition:transform .2s ease, box-shadow .2s ease; position:relative; user-select:none; }
+  .task:active { cursor:grabbing; }
+  .task:hover { box-shadow:0 2px 8px rgba(0,0,0,.1); }
+  .task.dragging { opacity:.3; transform:scale(.95); }
+  .drop-indicator { height:3px; background:var(--primary); border-radius:3px; margin:4px 0; transition:opacity .15s; }
+  .col-body.drag-active { background:rgba(79,70,229,.03); border-radius:8px; }
   .task.p-high { border-left-color:var(--high); }
   .task.p-medium { border-left-color:var(--medium); }
   .task.p-low { border-left-color:var(--low); }
@@ -176,10 +178,11 @@
 <div class="toast" id="toast"></div>
 
 <script>
-// Google Apps Script API (uses JSONP to bypass CORS)
 var SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyBBK7nRG11X3t4xe35l3y3WTkNrOVIABYXgEzZROpFwMWoO0LZr593jEqzCz3Pkl6ziA/exec';
 var tasks = [];
 var cbCounter = 0;
+var dragId = null;
+var saveTimer = null;
 
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
 
@@ -187,7 +190,7 @@ function toast(msg, dur) {
   var el = document.getElementById('toast');
   el.textContent = msg;
   el.classList.add('show');
-  setTimeout(function() { el.classList.remove('show'); }, dur || 2500);
+  setTimeout(function() { el.classList.remove('show'); }, dur || 2000);
 }
 
 function setConn(ok, text) {
@@ -196,39 +199,29 @@ function setConn(ok, text) {
   document.getElementById('connText').textContent = text;
 }
 
-// ---- JSONP (bypasses CORS from any domain) ----
+// ---- JSONP ----
 
 function jsonp(params) {
   return new Promise(function(resolve, reject) {
     var cbName = '_tb_cb_' + (++cbCounter);
     var timeout = setTimeout(function() {
       delete window[cbName];
-      if (script.parentNode) script.parentNode.removeChild(script);
+      if (s.parentNode) s.parentNode.removeChild(s);
       reject(new Error('Request timed out'));
     }, 20000);
-
     window[cbName] = function(data) {
       clearTimeout(timeout);
       delete window[cbName];
-      if (script.parentNode) script.parentNode.removeChild(script);
+      if (s.parentNode) s.parentNode.removeChild(s);
       resolve(data);
     };
-
     var url = SCRIPT_URL + '?callback=' + cbName;
     var keys = Object.keys(params);
-    for (var i = 0; i < keys.length; i++) {
-      url += '&' + encodeURIComponent(keys[i]) + '=' + encodeURIComponent(params[keys[i]]);
-    }
-
-    var script = document.createElement('script');
-    script.src = url;
-    script.onerror = function() {
-      clearTimeout(timeout);
-      delete window[cbName];
-      if (script.parentNode) script.parentNode.removeChild(script);
-      reject(new Error('Network error'));
-    };
-    document.head.appendChild(script);
+    for (var i = 0; i < keys.length; i++) url += '&' + encodeURIComponent(keys[i]) + '=' + encodeURIComponent(params[keys[i]]);
+    var s = document.createElement('script');
+    s.src = url;
+    s.onerror = function() { clearTimeout(timeout); delete window[cbName]; if (s.parentNode) s.parentNode.removeChild(s); reject(new Error('Network error')); };
+    document.head.appendChild(s);
   });
 }
 
@@ -237,36 +230,30 @@ function jsonp(params) {
 function refreshTasks() {
   setConn(true, 'Syncing...');
   jsonp({ action: 'getAll' }).then(function(data) {
-    if (Array.isArray(data)) {
-      tasks = data;
-      renderBoard();
-      setConn(true, 'Connected — auto-refreshes every 15s');
-    }
-  }).catch(function(err) {
-    setConn(false, 'Error: ' + err.message);
-  });
+    if (Array.isArray(data)) { tasks = data; renderBoard(); setConn(true, 'Connected — auto-refreshes every 15s'); }
+  }).catch(function(err) { setConn(false, 'Error: ' + err.message); });
 }
 
 function apiSave(task) {
-  return jsonp({ action: 'save', data: JSON.stringify(task) }).then(function() {
-    toast('Saved!');
-  }).catch(function(err) {
-    toast('Save error: ' + err.message);
-    setConn(false, 'Save failed — click Refresh');
+  return jsonp({ action: 'save', data: JSON.stringify(task) }).catch(function(err) {
+    toast('Save error'); setConn(false, 'Save failed — click Refresh');
   });
 }
 
 function apiDel(id) {
-  return jsonp({ action: 'delete', id: id }).then(function() {
-    toast('Deleted');
-  }).catch(function(err) {
-    toast('Delete error: ' + err.message);
-  });
+  return jsonp({ action: 'delete', id: id }).catch(function(err) { toast('Delete error'); });
+}
+
+// Debounced save — waits 500ms after last drag before saving
+function debouncedSave(task) {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(function() { apiSave(task).then(function() { toast('Saved!'); }); }, 500);
 }
 
 // ---- Modal ----
 
 function openModal(id) {
+  if (dragId) return; // don't open modal while dragging
   document.getElementById('modalTitle').textContent = id ? 'Edit Task' : 'New Task';
   document.getElementById('btnDelete').style.display = id ? '' : 'none';
   if (id) {
@@ -300,131 +287,147 @@ function saveTask() {
   var id = document.getElementById('taskId').value;
   var existing = id ? tasks.find(function(x) { return x.id === id; }) : null;
   var task = {
-    id: id || uid(),
-    title: title,
+    id: id || uid(), title: title,
     desc: document.getElementById('taskDesc').value.trim(),
     priority: document.getElementById('taskPriority').value,
     status: document.getElementById('taskStatus').value,
     assignee: document.getElementById('taskAssignee').value.trim(),
     due: document.getElementById('taskDue').value,
+    order: existing ? (existing.order || 0) : 999,
     created: existing ? existing.created : new Date().toISOString(),
     updated: new Date().toISOString()
   };
-  if (id) {
-    var idx = tasks.findIndex(function(x) { return x.id === id; });
-    if (idx >= 0) tasks[idx] = task;
-  } else {
-    tasks.push(task);
-  }
-  renderBoard();
-  closeModal();
-  toast('Saving...');
-  apiSave(task);
+  if (id) { var idx = tasks.findIndex(function(x) { return x.id === id; }); if (idx >= 0) tasks[idx] = task; }
+  else tasks.push(task);
+  renderBoard(); closeModal(); toast('Saving...');
+  apiSave(task).then(function() { toast('Saved!'); });
 }
 
 function deleteTask() {
   var id = document.getElementById('taskId').value;
   if (!id || !confirm('Delete this task?')) return;
   tasks = tasks.filter(function(x) { return x.id !== id; });
-  renderBoard();
-  closeModal();
-  toast('Deleting...');
-  apiDel(id);
+  renderBoard(); closeModal(); toast('Deleting...');
+  apiDel(id).then(function() { toast('Deleted'); });
 }
 
 function moveTask(id, newStatus) {
   var t = tasks.find(function(x) { return x.id === id; });
   if (!t) return;
-  t.status = newStatus;
-  t.updated = new Date().toISOString();
-  renderBoard();
-  apiSave(t);
-  toast('Moved');
+  t.status = newStatus; t.updated = new Date().toISOString();
+  renderBoard(); toast('Moving...');
+  apiSave(t).then(function() { toast('Moved!'); });
 }
 
-// ---- Drag & Drop ----
+// ---- Drag & Drop (smooth, 1 save per drag) ----
 
-var dragId = null;
+var didDrag = false;
 
-function onDragStart(e, id) {
-  dragId = id;
-  e.target.classList.add('dragging');
+function getColTasks(status) {
+  return tasks.filter(function(t) { return t.status === status; }).sort(function(a, b) { return (a.order || 0) - (b.order || 0); });
+}
+
+function calcOrder(colTasks, targetIdx) {
+  // Fractional ordering: only the dragged task gets a new order value
+  if (colTasks.length === 0) return 0;
+  if (targetIdx <= 0) return (colTasks[0].order || 0) - 1;
+  if (targetIdx >= colTasks.length) return (colTasks[colTasks.length - 1].order || 0) + 1;
+  var before = colTasks[targetIdx - 1].order || 0;
+  var after = colTasks[targetIdx].order || 0;
+  return (before + after) / 2;
+}
+
+document.addEventListener('dragstart', function(e) {
+  var taskEl = e.target.closest('.task');
+  if (!taskEl) return;
+  dragId = taskEl.getAttribute('data-id');
+  didDrag = false;
+  setTimeout(function() { taskEl.classList.add('dragging'); }, 0);
   e.dataTransfer.effectAllowed = 'move';
-}
+  e.dataTransfer.setData('text/plain', dragId);
+  // Highlight all columns
+  document.querySelectorAll('.col-body').forEach(function(el) { el.classList.add('drag-active'); });
+});
 
-function onDragEnd(e) {
-  e.target.classList.remove('dragging');
-  document.querySelectorAll('.drag-over').forEach(function(el) { el.classList.remove('drag-over'); });
-  dragId = null;
-}
+document.addEventListener('dragend', function(e) {
+  document.querySelectorAll('.dragging').forEach(function(el) { el.classList.remove('dragging'); });
+  document.querySelectorAll('.drop-indicator').forEach(function(el) { el.remove(); });
+  document.querySelectorAll('.drag-active').forEach(function(el) { el.classList.remove('drag-active'); });
+  if (didDrag) {
+    // prevent the click from opening the modal
+    setTimeout(function() { dragId = null; }, 200);
+  } else {
+    dragId = null;
+  }
+});
 
-function onDragOver(e) {
+document.addEventListener('dragover', function(e) {
+  var colBody = e.target.closest('.col-body');
+  if (!colBody) return;
   e.preventDefault();
   e.dataTransfer.dropEffect = 'move';
+
+  // Show drop indicator
+  document.querySelectorAll('.drop-indicator').forEach(function(el) { el.remove(); });
   var taskEl = e.target.closest('.task');
-  if (taskEl) {
-    document.querySelectorAll('.drag-over').forEach(function(el) { el.classList.remove('drag-over'); });
-    taskEl.classList.add('drag-over');
+  var indicator = document.createElement('div');
+  indicator.className = 'drop-indicator';
+  if (taskEl && taskEl.getAttribute('data-id') !== dragId) {
+    var rect = taskEl.getBoundingClientRect();
+    var mid = rect.top + rect.height / 2;
+    if (e.clientY < mid) {
+      taskEl.parentNode.insertBefore(indicator, taskEl);
+    } else {
+      taskEl.parentNode.insertBefore(indicator, taskEl.nextSibling);
+    }
+  } else if (!taskEl) {
+    colBody.appendChild(indicator);
   }
-}
+});
 
-function onDragLeave(e) {
-  var taskEl = e.target.closest('.task');
-  if (taskEl) taskEl.classList.remove('drag-over');
-}
-
-function onDrop(e, status) {
+document.addEventListener('drop', function(e) {
+  var colBody = e.target.closest('.col-body');
+  if (!colBody || !dragId) return;
   e.preventDefault();
-  document.querySelectorAll('.drag-over').forEach(function(el) { el.classList.remove('drag-over'); });
-  if (!dragId) return;
+  didDrag = true;
+  document.querySelectorAll('.drop-indicator').forEach(function(el) { el.remove(); });
 
-  var targetEl = e.target.closest('.task');
-  var targetId = targetEl ? targetEl.getAttribute('data-id') : null;
+  var col = colBody.parentElement;
+  var status = col.classList.contains('col-todo') ? 'todo' : col.classList.contains('col-progress') ? 'progress' : 'done';
 
-  // Get tasks in this column, sorted by order
-  var colTasks = tasks.filter(function(t) { return t.status === status; }).sort(function(a, b) { return (a.order || 0) - (b.order || 0); });
-
-  // Move dragged task to this column
   var draggedTask = tasks.find(function(t) { return t.id === dragId; });
   if (!draggedTask) return;
-  draggedTask.status = status;
 
-  // Remove dragged from colTasks if already there
-  colTasks = colTasks.filter(function(t) { return t.id !== dragId; });
+  // Figure out drop position
+  var colTasks = getColTasks(status).filter(function(t) { return t.id !== dragId; });
+  var taskEl = e.target.closest('.task');
+  var newOrder;
 
-  // Insert at target position
-  if (targetId) {
+  if (taskEl && taskEl.getAttribute('data-id') !== dragId) {
+    var targetId = taskEl.getAttribute('data-id');
     var targetIdx = -1;
     for (var i = 0; i < colTasks.length; i++) {
       if (colTasks[i].id === targetId) { targetIdx = i; break; }
     }
     if (targetIdx >= 0) {
-      colTasks.splice(targetIdx, 0, draggedTask);
+      var rect = taskEl.getBoundingClientRect();
+      var dropAfter = e.clientY > rect.top + rect.height / 2;
+      newOrder = calcOrder(colTasks, dropAfter ? targetIdx + 1 : targetIdx);
     } else {
-      colTasks.push(draggedTask);
+      newOrder = calcOrder(colTasks, colTasks.length);
     }
   } else {
-    colTasks.push(draggedTask);
+    newOrder = calcOrder(colTasks, colTasks.length);
   }
 
-  // Update order for all tasks in this column
-  var changed = [];
-  for (var j = 0; j < colTasks.length; j++) {
-    colTasks[j].order = j;
-    colTasks[j].updated = new Date().toISOString();
-    changed.push(colTasks[j]);
-  }
+  // Update only the dragged task
+  draggedTask.status = status;
+  draggedTask.order = newOrder;
+  draggedTask.updated = new Date().toISOString();
 
   renderBoard();
-  toast('Reordering...');
-
-  // Save all reordered tasks
-  var saveNext = function(idx) {
-    if (idx >= changed.length) { toast('Order saved!'); return; }
-    apiSave(changed[idx]).then(function() { saveNext(idx + 1); });
-  };
-  saveNext(0);
-}
+  debouncedSave(draggedTask); // single save, debounced
+});
 
 // ---- Render ----
 
@@ -456,17 +459,14 @@ function renderBoard() {
     var col = document.getElementById(colId);
     var count = document.getElementById(countId);
     count.textContent = groups[status].length;
-    if (!groups[status].length) {
-      col.innerHTML = '<div class="empty" ondragover="onDragOver(event)" ondrop="onDrop(event,\'' + status + '\')">No tasks — drop here</div>';
-      return;
-    }
-    col.innerHTML = groups[status].map(function(t) {
+    if (!groups[status].length) { col.innerHTML = '<div class="empty">No tasks</div>'; return; }
+    col.innerHTML = groups[status].map(function(t, i) {
       var moves = [];
       if (status !== 'todo') moves.push('<button title="Move to To Do" onclick="event.stopPropagation();moveTask(\'' + t.id + '\',\'todo\')">&laquo;</button>');
       if (status !== 'done') moves.push('<button title="Move forward" onclick="event.stopPropagation();moveTask(\'' + t.id + '\',\'' + (status === 'todo' ? 'progress' : 'done') + '\')">&raquo;</button>');
-      return '<div class="task p-' + t.priority + '" data-id="' + t.id + '" draggable="true" ondragstart="onDragStart(event,\'' + t.id + '\')" ondragend="onDragEnd(event)" ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event,\'' + status + '\')" onclick="openModal(\'' + t.id + '\')">' +
+      return '<div class="task p-' + t.priority + '" data-id="' + t.id + '" draggable="true" onclick="openModal(\'' + t.id + '\')">' +
         '<div class="task-actions">' + moves.join('') + '</div>' +
-        '<div class="title">' + esc(t.title) + '</div>' +
+        '<div class="title"><span style="color:var(--muted);font-size:.72rem;margin-right:4px">' + (i + 1) + '.</span>' + esc(t.title) + '</div>' +
         (t.desc ? '<div class="desc">' + esc(t.desc) + '</div>' : '') +
         '<div class="meta">' +
         '<span class="badge badge-' + t.priority + '">' + t.priority.toUpperCase() + '</span>' +
