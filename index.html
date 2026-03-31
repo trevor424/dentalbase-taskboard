@@ -183,6 +183,35 @@ var tasks = [];
 var cbCounter = 0;
 var dragId = null;
 var saveTimer = null;
+var ORDER_KEY = 'taskboard_order';
+
+// ---- Local order storage ----
+function loadOrder() {
+  try { return JSON.parse(localStorage.getItem(ORDER_KEY)) || {}; } catch(e) { return {}; }
+}
+function saveOrder() {
+  var order = {};
+  tasks.forEach(function(t) { order[t.id] = t.order; });
+  localStorage.setItem(ORDER_KEY, JSON.stringify(order));
+}
+function applyOrder() {
+  var order = loadOrder();
+  // Assign saved order, or keep creation order for new tasks
+  var maxOrder = 0;
+  tasks.forEach(function(t) {
+    if (order[t.id] !== undefined) {
+      t.order = order[t.id];
+      if (t.order > maxOrder) maxOrder = t.order;
+    }
+  });
+  // Tasks without saved order get placed at the end in their original sequence
+  tasks.forEach(function(t) {
+    if (order[t.id] === undefined) {
+      maxOrder++;
+      t.order = maxOrder;
+    }
+  });
+}
 
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
 
@@ -230,7 +259,7 @@ function jsonp(params) {
 function refreshTasks() {
   setConn(true, 'Syncing...');
   jsonp({ action: 'getAll' }).then(function(data) {
-    if (Array.isArray(data)) { tasks = data; renderBoard(); setConn(true, 'Connected — auto-refreshes every 15s'); }
+    if (Array.isArray(data)) { tasks = data; applyOrder(); renderBoard(); setConn(true, 'Connected — auto-refreshes every 15s'); }
   }).catch(function(err) { setConn(false, 'Error: ' + err.message); });
 }
 
@@ -244,11 +273,6 @@ function apiDel(id) {
   return jsonp({ action: 'delete', id: id }).catch(function(err) { toast('Delete error'); });
 }
 
-// Debounced save — waits 500ms after last drag before saving
-function debouncedSave(task) {
-  clearTimeout(saveTimer);
-  saveTimer = setTimeout(function() { apiSave(task).then(function() { toast('Saved!'); }); }, 500);
-}
 
 // ---- Modal ----
 
@@ -327,15 +351,7 @@ function getColTasks(status) {
   return tasks.filter(function(t) { return t.status === status; }).sort(function(a, b) { return (a.order || 0) - (b.order || 0); });
 }
 
-function calcOrder(colTasks, targetIdx) {
-  // Fractional ordering: only the dragged task gets a new order value
-  if (colTasks.length === 0) return 0;
-  if (targetIdx <= 0) return (colTasks[0].order || 0) - 1;
-  if (targetIdx >= colTasks.length) return (colTasks[colTasks.length - 1].order || 0) + 1;
-  var before = colTasks[targetIdx - 1].order || 0;
-  var after = colTasks[targetIdx].order || 0;
-  return (before + after) / 2;
-}
+
 
 document.addEventListener('dragstart', function(e) {
   var taskEl = e.target.closest('.task');
@@ -393,40 +409,55 @@ document.addEventListener('drop', function(e) {
   document.querySelectorAll('.drop-indicator').forEach(function(el) { el.remove(); });
 
   var col = colBody.parentElement;
-  var status = col.classList.contains('col-todo') ? 'todo' : col.classList.contains('col-progress') ? 'progress' : 'done';
+  var newStatus = col.classList.contains('col-todo') ? 'todo' : col.classList.contains('col-progress') ? 'progress' : 'done';
 
   var draggedTask = tasks.find(function(t) { return t.id === dragId; });
   if (!draggedTask) return;
 
-  // Figure out drop position
-  var colTasks = getColTasks(status).filter(function(t) { return t.id !== dragId; });
+  var oldStatus = draggedTask.status;
+  var statusChanged = oldStatus !== newStatus;
+
+  // Get tasks in target column (excluding dragged), sorted by order
+  var colTasks = getColTasks(newStatus).filter(function(t) { return t.id !== dragId; });
   var taskEl = e.target.closest('.task');
-  var newOrder;
+
+  // Figure out insert position and rebuild order as integers
+  var insertIdx = colTasks.length; // default: end
 
   if (taskEl && taskEl.getAttribute('data-id') !== dragId) {
     var targetId = taskEl.getAttribute('data-id');
-    var targetIdx = -1;
     for (var i = 0; i < colTasks.length; i++) {
-      if (colTasks[i].id === targetId) { targetIdx = i; break; }
+      if (colTasks[i].id === targetId) {
+        var rect = taskEl.getBoundingClientRect();
+        insertIdx = e.clientY > rect.top + rect.height / 2 ? i + 1 : i;
+        break;
+      }
     }
-    if (targetIdx >= 0) {
-      var rect = taskEl.getBoundingClientRect();
-      var dropAfter = e.clientY > rect.top + rect.height / 2;
-      newOrder = calcOrder(colTasks, dropAfter ? targetIdx + 1 : targetIdx);
-    } else {
-      newOrder = calcOrder(colTasks, colTasks.length);
-    }
-  } else {
-    newOrder = calcOrder(colTasks, colTasks.length);
   }
 
-  // Update only the dragged task
-  draggedTask.status = status;
-  draggedTask.order = newOrder;
+  // Insert dragged task at position
+  colTasks.splice(insertIdx, 0, draggedTask);
+
+  // Reassign clean integer orders for entire column
+  for (var j = 0; j < colTasks.length; j++) {
+    colTasks[j].order = j;
+  }
+
+  // Update dragged task
+  draggedTask.status = newStatus;
   draggedTask.updated = new Date().toISOString();
 
+  // Save order locally (instant, no API lag)
+  saveOrder();
   renderBoard();
-  debouncedSave(draggedTask); // single save, debounced
+
+  // Only call API if column changed (status update needed)
+  if (statusChanged) {
+    toast('Moving...');
+    apiSave(draggedTask).then(function() { toast('Moved!'); });
+  } else {
+    toast('Reordered!');
+  }
 });
 
 // ---- Render ----
