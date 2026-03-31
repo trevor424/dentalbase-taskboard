@@ -28,12 +28,19 @@
     "title": "Meta Ads",
     "desc": "",
     "priority": "medium",
-    "status": "todo",
+    "status": "progress",
     "assignee": "",
     "due": "",
     "created": "2026-03-31T11:46:08.380Z",
-    "updated": "2026-03-31T12:30:54.441Z",
-    "order": 0
+    "updated": "2026-03-31T18:19:29.384Z",
+    "order": 1,
+    "sessions": [
+      {
+        "start": "2026-03-31T18:19:29.384Z",
+        "end": null
+      }
+    ],
+    "completed": null
   },
   {
     "id": "mnejx1a8uterl",
