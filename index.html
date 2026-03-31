@@ -174,8 +174,10 @@
 <div class="toast" id="toast"></div>
 
 <script>
-var API = 'https://jsonblob.com/api/jsonBlob/019d43a6-c4f5-780d-9526-9a0e8b002d2f';
+// Google Apps Script API (uses JSONP to bypass CORS)
+var SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyBBK7nRG11X3t4xe35l3y3WTkNrOVIABYXgEzZROpFwMWoO0LZr593jEqzCz3Pkl6ziA/exec';
 var tasks = [];
+var cbCounter = 0;
 
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
 
@@ -192,34 +194,71 @@ function setConn(ok, text) {
   document.getElementById('connText').textContent = text;
 }
 
+// ---- JSONP (bypasses CORS from any domain) ----
+
+function jsonp(params) {
+  return new Promise(function(resolve, reject) {
+    var cbName = '_tb_cb_' + (++cbCounter);
+    var timeout = setTimeout(function() {
+      delete window[cbName];
+      if (script.parentNode) script.parentNode.removeChild(script);
+      reject(new Error('Request timed out'));
+    }, 20000);
+
+    window[cbName] = function(data) {
+      clearTimeout(timeout);
+      delete window[cbName];
+      if (script.parentNode) script.parentNode.removeChild(script);
+      resolve(data);
+    };
+
+    var url = SCRIPT_URL + '?callback=' + cbName;
+    var keys = Object.keys(params);
+    for (var i = 0; i < keys.length; i++) {
+      url += '&' + encodeURIComponent(keys[i]) + '=' + encodeURIComponent(params[keys[i]]);
+    }
+
+    var script = document.createElement('script');
+    script.src = url;
+    script.onerror = function() {
+      clearTimeout(timeout);
+      delete window[cbName];
+      if (script.parentNode) script.parentNode.removeChild(script);
+      reject(new Error('Network error'));
+    };
+    document.head.appendChild(script);
+  });
+}
+
 // ---- API ----
 
 function refreshTasks() {
   setConn(true, 'Syncing...');
-  fetch(API, { headers: { 'Accept': 'application/json' } })
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-      if (Array.isArray(data)) {
-        tasks = data;
-        renderBoard();
-        setConn(true, 'Connected — auto-refreshes every 15s');
-      }
-    })
-    .catch(function(err) {
-      setConn(false, 'Error: ' + err.message);
-    });
+  jsonp({ action: 'getAll' }).then(function(data) {
+    if (Array.isArray(data)) {
+      tasks = data;
+      renderBoard();
+      setConn(true, 'Connected — auto-refreshes every 15s');
+    }
+  }).catch(function(err) {
+    setConn(false, 'Error: ' + err.message);
+  });
 }
 
-function saveTasks() {
-  return fetch(API, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-    body: JSON.stringify(tasks)
-  }).then(function() {
+function apiSave(task) {
+  return jsonp({ action: 'save', data: JSON.stringify(task) }).then(function() {
     toast('Saved!');
   }).catch(function(err) {
     toast('Save error: ' + err.message);
     setConn(false, 'Save failed — click Refresh');
+  });
+}
+
+function apiDel(id) {
+  return jsonp({ action: 'delete', id: id }).then(function() {
+    toast('Deleted');
+  }).catch(function(err) {
+    toast('Delete error: ' + err.message);
   });
 }
 
@@ -278,7 +317,7 @@ function saveTask() {
   renderBoard();
   closeModal();
   toast('Saving...');
-  saveTasks();
+  apiSave(task);
 }
 
 function deleteTask() {
@@ -288,7 +327,7 @@ function deleteTask() {
   renderBoard();
   closeModal();
   toast('Deleting...');
-  saveTasks();
+  apiDel(id);
 }
 
 function moveTask(id, newStatus) {
@@ -297,7 +336,7 @@ function moveTask(id, newStatus) {
   t.status = newStatus;
   t.updated = new Date().toISOString();
   renderBoard();
-  saveTasks();
+  apiSave(t);
   toast('Moved');
 }
 
@@ -318,7 +357,7 @@ function renderBoard() {
   sel.value = curVal;
 
   var filtered = tasks.filter(function(t) {
-    if (search && t.title.toLowerCase().indexOf(search) === -1 && (t.desc||'').toLowerCase().indexOf(search) === -1) return false;
+    if (search && t.title.toLowerCase().indexOf(search) === -1 && (t.desc || '').toLowerCase().indexOf(search) === -1) return false;
     if (fp && t.priority !== fp) return false;
     if (fa && t.assignee !== fa) return false;
     return true;
@@ -336,26 +375,26 @@ function renderBoard() {
     if (!groups[status].length) { col.innerHTML = '<div class="empty">No tasks</div>'; return; }
     col.innerHTML = groups[status].map(function(t) {
       var moves = [];
-      if (status !== 'todo') moves.push('<button title="Move to To Do" onclick="event.stopPropagation();moveTask(\'' + t.id + '\',\'todo\')">&#9664;</button>');
-      if (status !== 'done') moves.push('<button title="Move forward" onclick="event.stopPropagation();moveTask(\'' + t.id + '\',\'' + (status==='todo'?'progress':'done') + '\')">&#9654;</button>');
+      if (status !== 'todo') moves.push('<button title="Move to To Do" onclick="event.stopPropagation();moveTask(\'' + t.id + '\',\'todo\')">&laquo;</button>');
+      if (status !== 'done') moves.push('<button title="Move forward" onclick="event.stopPropagation();moveTask(\'' + t.id + '\',\'' + (status === 'todo' ? 'progress' : 'done') + '\')">&raquo;</button>');
       return '<div class="task p-' + t.priority + '" onclick="openModal(\'' + t.id + '\')">' +
         '<div class="task-actions">' + moves.join('') + '</div>' +
         '<div class="title">' + esc(t.title) + '</div>' +
         (t.desc ? '<div class="desc">' + esc(t.desc) + '</div>' : '') +
         '<div class="meta">' +
-          '<span class="badge badge-' + t.priority + '">' + t.priority.toUpperCase() + '</span>' +
-          (t.assignee ? '<span class="badge badge-assignee">' + esc(t.assignee) + '</span>' : '') +
-          (t.due ? '<span class="badge badge-date">' + t.due + '</span>' : '') +
+        '<span class="badge badge-' + t.priority + '">' + t.priority.toUpperCase() + '</span>' +
+        (t.assignee ? '<span class="badge badge-assignee">' + esc(t.assignee) + '</span>' : '') +
+        (t.due ? '<span class="badge badge-date">' + t.due + '</span>' : '') +
         '</div></div>';
     }).join('');
   });
 
   document.getElementById('stats').innerHTML =
     '<div class="stat"><div class="num">' + tasks.length + '</div><div class="label">Total</div></div>' +
-    '<div class="stat"><div class="num" style="color:var(--todo)">' + tasks.filter(function(t){return t.status==='todo';}).length + '</div><div class="label">To Do</div></div>' +
-    '<div class="stat"><div class="num" style="color:var(--progress)">' + tasks.filter(function(t){return t.status==='progress';}).length + '</div><div class="label">In Progress</div></div>' +
-    '<div class="stat"><div class="num" style="color:var(--done)">' + tasks.filter(function(t){return t.status==='done';}).length + '</div><div class="label">Done</div></div>' +
-    '<div class="stat"><div class="num" style="color:var(--high)">' + tasks.filter(function(t){return t.priority==='high';}).length + '</div><div class="label">High Priority</div></div>';
+    '<div class="stat"><div class="num" style="color:var(--todo)">' + tasks.filter(function(t) { return t.status === 'todo'; }).length + '</div><div class="label">To Do</div></div>' +
+    '<div class="stat"><div class="num" style="color:var(--progress)">' + tasks.filter(function(t) { return t.status === 'progress'; }).length + '</div><div class="label">In Progress</div></div>' +
+    '<div class="stat"><div class="num" style="color:var(--done)">' + tasks.filter(function(t) { return t.status === 'done'; }).length + '</div><div class="label">Done</div></div>' +
+    '<div class="stat"><div class="num" style="color:var(--high)">' + tasks.filter(function(t) { return t.priority === 'high'; }).length + '</div><div class="label">High Priority</div></div>';
 }
 
 function esc(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
