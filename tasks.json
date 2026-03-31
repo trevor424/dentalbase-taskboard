@@ -64,11 +64,11 @@
     "title": "Exploring GPT Ads",
     "desc": "https://openai.com/index/testing-ads-in-chatgpt/",
     "priority": "medium",
-    "status": "todo",
+    "status": "progress",
     "assignee": "",
     "due": "",
-    "order": 2,
+    "order": 0,
     "created": "2026-03-31T16:00:23.230Z",
-    "updated": "2026-03-31T16:27:36.141Z"
+    "updated": "2026-03-31T17:42:34.981Z"
   }
 ]
