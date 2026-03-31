@@ -8,8 +8,8 @@
     "assignee": "",
     "due": "",
     "created": "2026-03-31T11:45:32.493Z",
-    "updated": "2026-03-31T16:00:30.622Z",
-    "order": 2
+    "updated": "2026-03-31T16:27:37.732Z",
+    "order": 3
   },
   {
     "id": "mnejw4knkkptn",
@@ -66,7 +66,7 @@
     "status": "todo",
     "assignee": "",
     "due": "",
-    "order": 3,
+    "order": 2,
     "created": "2026-03-31T16:00:23.230Z",
     "updated": "2026-03-31T16:27:36.141Z"
   }
