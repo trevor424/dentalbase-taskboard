@@ -21,7 +21,7 @@
     "due": "",
     "created": "2026-03-31T11:45:41.927Z",
     "updated": "2026-03-31T17:42:31.185Z",
-    "order": 1
+    "order": 2
   },
   {
     "id": "mnejwozgu7p8w",
@@ -64,7 +64,7 @@
     "due": "",
     "created": "2026-03-31T12:29:04.815Z",
     "updated": "2026-03-31T15:43:05.324Z",
-    "order": 3
+    "order": 1
   },
   {
     "id": "mnesznpa0nhur",
@@ -74,7 +74,7 @@
     "status": "done",
     "assignee": "",
     "due": "",
-    "order": 2,
+    "order": 3,
     "created": "2026-03-31T16:00:23.230Z",
     "updated": "2026-03-31T20:23:57.969Z",
     "completed": "2026-03-31T20:23:57.969Z",
