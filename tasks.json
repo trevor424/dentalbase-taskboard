@@ -9,7 +9,7 @@
     "due": "",
     "created": "2026-03-31T11:45:32.493Z",
     "updated": "2026-03-31T16:27:37.732Z",
-    "order": 3
+    "order": 1
   },
   {
     "id": "mnejw4knkkptn",
@@ -33,7 +33,7 @@
     "due": "",
     "created": "2026-03-31T11:46:08.380Z",
     "updated": "2026-03-31T12:30:54.441Z",
-    "order": 1
+    "order": 0
   },
   {
     "id": "mnejx1a8uterl",
@@ -64,11 +64,12 @@
     "title": "Exploring GPT Ads",
     "desc": "https://openai.com/index/testing-ads-in-chatgpt/",
     "priority": "medium",
-    "status": "progress",
+    "status": "todo",
     "assignee": "",
     "due": "",
-    "order": 0,
+    "order": 2,
     "created": "2026-03-31T16:00:23.230Z",
-    "updated": "2026-03-31T17:42:34.981Z"
+    "updated": "2026-03-31T18:19:15.580Z",
+    "completed": null
   }
 ]
