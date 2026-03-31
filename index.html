@@ -48,8 +48,10 @@
   .col-header .count { margin-left:auto; background:var(--bg); padding:2px 8px; border-radius:12px; font-size:.75rem; color:var(--muted); }
   .col-body { padding:10px; min-height:120px; }
 
-  .task { background:var(--bg); border-radius:8px; padding:12px; margin-bottom:8px; cursor:default; border-left:4px solid transparent; transition:.15s; position:relative; }
+  .task { background:var(--bg); border-radius:8px; padding:12px; margin-bottom:8px; cursor:grab; border-left:4px solid transparent; transition:box-shadow .15s, opacity .15s, transform .15s; position:relative; user-select:none; }
   .task:hover { box-shadow:0 2px 8px rgba(0,0,0,.08); }
+  .task.dragging { opacity:.4; transform:scale(.97); }
+  .task.drag-over { box-shadow:0 -3px 0 0 var(--primary), 0 2px 8px rgba(0,0,0,.08); }
   .task.p-high { border-left-color:var(--high); }
   .task.p-medium { border-left-color:var(--medium); }
   .task.p-low { border-left-color:var(--low); }
@@ -340,9 +342,91 @@ function moveTask(id, newStatus) {
   toast('Moved');
 }
 
-// ---- Render ----
+// ---- Drag & Drop ----
 
-var priorityOrder = { high: 0, medium: 1, low: 2 };
+var dragId = null;
+
+function onDragStart(e, id) {
+  dragId = id;
+  e.target.classList.add('dragging');
+  e.dataTransfer.effectAllowed = 'move';
+}
+
+function onDragEnd(e) {
+  e.target.classList.remove('dragging');
+  document.querySelectorAll('.drag-over').forEach(function(el) { el.classList.remove('drag-over'); });
+  dragId = null;
+}
+
+function onDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  var taskEl = e.target.closest('.task');
+  if (taskEl) {
+    document.querySelectorAll('.drag-over').forEach(function(el) { el.classList.remove('drag-over'); });
+    taskEl.classList.add('drag-over');
+  }
+}
+
+function onDragLeave(e) {
+  var taskEl = e.target.closest('.task');
+  if (taskEl) taskEl.classList.remove('drag-over');
+}
+
+function onDrop(e, status) {
+  e.preventDefault();
+  document.querySelectorAll('.drag-over').forEach(function(el) { el.classList.remove('drag-over'); });
+  if (!dragId) return;
+
+  var targetEl = e.target.closest('.task');
+  var targetId = targetEl ? targetEl.getAttribute('data-id') : null;
+
+  // Get tasks in this column, sorted by order
+  var colTasks = tasks.filter(function(t) { return t.status === status; }).sort(function(a, b) { return (a.order || 0) - (b.order || 0); });
+
+  // Move dragged task to this column
+  var draggedTask = tasks.find(function(t) { return t.id === dragId; });
+  if (!draggedTask) return;
+  draggedTask.status = status;
+
+  // Remove dragged from colTasks if already there
+  colTasks = colTasks.filter(function(t) { return t.id !== dragId; });
+
+  // Insert at target position
+  if (targetId) {
+    var targetIdx = -1;
+    for (var i = 0; i < colTasks.length; i++) {
+      if (colTasks[i].id === targetId) { targetIdx = i; break; }
+    }
+    if (targetIdx >= 0) {
+      colTasks.splice(targetIdx, 0, draggedTask);
+    } else {
+      colTasks.push(draggedTask);
+    }
+  } else {
+    colTasks.push(draggedTask);
+  }
+
+  // Update order for all tasks in this column
+  var changed = [];
+  for (var j = 0; j < colTasks.length; j++) {
+    colTasks[j].order = j;
+    colTasks[j].updated = new Date().toISOString();
+    changed.push(colTasks[j]);
+  }
+
+  renderBoard();
+  toast('Reordering...');
+
+  // Save all reordered tasks
+  var saveNext = function(idx) {
+    if (idx >= changed.length) { toast('Order saved!'); return; }
+    apiSave(changed[idx]).then(function() { saveNext(idx + 1); });
+  };
+  saveNext(0);
+}
+
+// ---- Render ----
 
 function renderBoard() {
   var search = document.getElementById('search').value.toLowerCase();
@@ -361,7 +445,7 @@ function renderBoard() {
     if (fp && t.priority !== fp) return false;
     if (fa && t.assignee !== fa) return false;
     return true;
-  }).sort(function(a, b) { return priorityOrder[a.priority] - priorityOrder[b.priority]; });
+  }).sort(function(a, b) { return (a.order || 0) - (b.order || 0); });
 
   var groups = { todo: [], progress: [], done: [] };
   filtered.forEach(function(t) { if (groups[t.status]) groups[t.status].push(t); });
@@ -372,12 +456,15 @@ function renderBoard() {
     var col = document.getElementById(colId);
     var count = document.getElementById(countId);
     count.textContent = groups[status].length;
-    if (!groups[status].length) { col.innerHTML = '<div class="empty">No tasks</div>'; return; }
+    if (!groups[status].length) {
+      col.innerHTML = '<div class="empty" ondragover="onDragOver(event)" ondrop="onDrop(event,\'' + status + '\')">No tasks — drop here</div>';
+      return;
+    }
     col.innerHTML = groups[status].map(function(t) {
       var moves = [];
       if (status !== 'todo') moves.push('<button title="Move to To Do" onclick="event.stopPropagation();moveTask(\'' + t.id + '\',\'todo\')">&laquo;</button>');
       if (status !== 'done') moves.push('<button title="Move forward" onclick="event.stopPropagation();moveTask(\'' + t.id + '\',\'' + (status === 'todo' ? 'progress' : 'done') + '\')">&raquo;</button>');
-      return '<div class="task p-' + t.priority + '" onclick="openModal(\'' + t.id + '\')">' +
+      return '<div class="task p-' + t.priority + '" data-id="' + t.id + '" draggable="true" ondragstart="onDragStart(event,\'' + t.id + '\')" ondragend="onDragEnd(event)" ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event,\'' + status + '\')" onclick="openModal(\'' + t.id + '\')">' +
         '<div class="task-actions">' + moves.join('') + '</div>' +
         '<div class="title">' + esc(t.title) + '</div>' +
         (t.desc ? '<div class="desc">' + esc(t.desc) + '</div>' : '') +
