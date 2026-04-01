@@ -16,16 +16,20 @@
     "title": "Dentrix Test",
     "desc": "",
     "priority": "medium",
-    "status": "todo",
+    "status": "progress",
     "assignee": "",
     "due": "",
     "created": "2026-03-31T11:45:41.927Z",
-    "updated": "2026-04-01T14:24:44.989Z",
-    "order": 2,
+    "updated": "2026-04-01T15:51:50.549Z",
+    "order": 1,
     "sessions": [
       {
         "start": "2026-04-01T10:15:05.455Z",
         "end": "2026-04-01T14:24:44.989Z"
+      },
+      {
+        "start": "2026-04-01T15:51:50.549Z",
+        "end": null
       }
     ],
     "completed": null
@@ -100,7 +104,7 @@
     "status": "progress",
     "assignee": "",
     "due": "",
-    "order": 999,
+    "order": 0,
     "sessions": [
       {
         "start": "2026-04-01T14:25:00.442Z",
