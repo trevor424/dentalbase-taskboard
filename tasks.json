@@ -91,5 +91,24 @@
         "end": "2026-03-31T20:23:57.969Z"
       }
     ]
+  },
+  {
+    "id": "mng50umyemjv2",
+    "title": "Telnyx Testing",
+    "desc": "",
+    "priority": "medium",
+    "status": "progress",
+    "assignee": "",
+    "due": "",
+    "order": 999,
+    "sessions": [
+      {
+        "start": "2026-04-01T14:25:00.442Z",
+        "end": null
+      }
+    ],
+    "created": "2026-04-01T14:25:00.442Z",
+    "updated": "2026-04-01T14:25:00.442Z",
+    "completed": null
   }
 ]
