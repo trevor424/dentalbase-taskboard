@@ -4,19 +4,19 @@
     "title": "CRM Testing",
     "desc": "",
     "priority": "medium",
-    "status": "progress",
+    "status": "done",
     "assignee": "",
     "due": "",
     "created": "2026-03-31T11:45:32.493Z",
-    "updated": "2026-04-03T11:29:46.720Z",
-    "order": 0,
+    "updated": "2026-04-05T10:52:33.039Z",
+    "order": 5,
     "sessions": [
       {
         "start": "2026-04-03T11:29:46.720Z",
-        "end": null
+        "end": "2026-04-05T10:52:33.039Z"
       }
     ],
-    "completed": null
+    "completed": "2026-04-05T10:52:33.039Z"
   },
   {
     "id": "mnejw4knkkptn",
