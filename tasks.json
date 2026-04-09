@@ -131,18 +131,18 @@
     "title": "Open Dental",
     "desc": "",
     "priority": "medium",
-    "status": "progress",
+    "status": "todo",
     "assignee": "",
     "due": "",
-    "order": 999,
+    "order": 1,
     "sessions": [
       {
         "start": "2026-04-05T10:58:11.451Z",
-        "end": null
+        "end": "2026-04-09T09:36:44.183Z"
       }
     ],
     "created": "2026-04-05T10:58:11.451Z",
-    "updated": "2026-04-05T10:58:11.451Z",
+    "updated": "2026-04-09T09:36:44.183Z",
     "completed": null
   }
 ]
