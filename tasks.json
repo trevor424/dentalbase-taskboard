@@ -69,16 +69,16 @@
     "title": "Onboarding form",
     "desc": "",
     "priority": "high",
-    "status": "progress",
+    "status": "todo",
     "assignee": "",
     "due": "",
     "created": "2026-03-31T11:46:24.320Z",
-    "updated": "2026-04-09T09:36:53.161Z",
-    "order": 0,
+    "updated": "2026-04-10T08:49:33.421Z",
+    "order": 2,
     "sessions": [
       {
         "start": "2026-04-09T09:36:53.161Z",
-        "end": null
+        "end": "2026-04-10T08:49:33.421Z"
       }
     ],
     "completed": null
