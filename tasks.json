@@ -8,15 +8,15 @@
     "assignee": "",
     "due": "",
     "created": "2026-03-31T11:45:32.493Z",
-    "updated": "2026-04-05T10:52:33.039Z",
-    "order": 4,
+    "updated": "2026-04-11T20:07:12.181Z",
+    "order": 0,
     "sessions": [
       {
         "start": "2026-04-03T11:29:46.720Z",
-        "end": "2026-04-05T10:52:33.039Z"
+        "end": "2026-04-11T20:07:12.180Z"
       }
     ],
-    "completed": "2026-04-05T10:52:33.039Z"
+    "completed": "2026-04-11T20:07:12.180Z"
   },
   {
     "id": "mnejw4knkkptn",
@@ -50,20 +50,16 @@
     "title": "Meta Ads",
     "desc": "",
     "priority": "medium",
-    "status": "progress",
+    "status": "todo",
     "assignee": "",
     "due": "",
     "created": "2026-03-31T11:46:08.380Z",
-    "updated": "2026-04-10T08:49:38.102Z",
+    "updated": "2026-03-31T19:17:18.088Z",
     "order": 0,
     "sessions": [
       {
         "start": "2026-03-31T18:19:29.384Z",
         "end": "2026-03-31T19:17:18.088Z"
-      },
-      {
-        "start": "2026-04-10T08:49:38.102Z",
-        "end": null
       }
     ],
     "completed": null
@@ -73,19 +69,12 @@
     "title": "Onboarding form",
     "desc": "",
     "priority": "high",
-    "status": "todo",
+    "status": "done",
     "assignee": "",
     "due": "",
     "created": "2026-03-31T11:46:24.320Z",
-    "updated": "2026-04-10T08:49:33.421Z",
-    "order": 2,
-    "sessions": [
-      {
-        "start": "2026-04-09T09:36:53.161Z",
-        "end": "2026-04-10T08:49:33.421Z"
-      }
-    ],
-    "completed": null
+    "updated": "2026-03-31T17:02:39.000Z",
+    "order": 2
   },
   {
     "id": "mnelfwz3xfkan",
@@ -97,7 +86,7 @@
     "due": "",
     "created": "2026-03-31T12:29:04.815Z",
     "updated": "2026-03-31T15:43:05.324Z",
-    "order": 0
+    "order": 1
   },
   {
     "id": "mnesznpa0nhur",
@@ -107,7 +96,7 @@
     "status": "done",
     "assignee": "",
     "due": "",
-    "order": 2,
+    "order": 3,
     "created": "2026-03-31T16:00:23.230Z",
     "updated": "2026-03-31T20:23:57.969Z",
     "completed": "2026-03-31T20:23:57.969Z",
@@ -126,7 +115,7 @@
     "status": "done",
     "assignee": "",
     "due": "",
-    "order": 3,
+    "order": 4,
     "sessions": [
       {
         "start": "2026-04-01T14:25:00.442Z",
@@ -136,24 +125,5 @@
     "created": "2026-04-01T14:25:00.442Z",
     "updated": "2026-04-02T14:25:35.942Z",
     "completed": "2026-04-02T14:25:35.942Z"
-  },
-  {
-    "id": "mnlneagrz5zto",
-    "title": "Open Dental",
-    "desc": "",
-    "priority": "medium",
-    "status": "todo",
-    "assignee": "",
-    "due": "",
-    "order": 1,
-    "sessions": [
-      {
-        "start": "2026-04-05T10:58:11.451Z",
-        "end": "2026-04-09T09:36:44.183Z"
-      }
-    ],
-    "created": "2026-04-05T10:58:11.451Z",
-    "updated": "2026-04-09T09:36:44.183Z",
-    "completed": null
   }
 ]
